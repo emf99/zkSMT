@@ -1,0 +1,27 @@
+{
+  "canisters": {
+    "ss1_backend": {
+      "candid": "src/ss1_backend/ss1_backend.did",
+      "package": "ss1_backend",
+      "type": "rust"
+    },
+    "ss1_frontend": {
+      "dependencies": [
+        "ss1_backend"
+      ],
+      "source": [
+        "src/ss1_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "ss1_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

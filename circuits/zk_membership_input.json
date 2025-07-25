@@ -1,0 +1,9 @@
+{
+  "publicKey": "123",
+  "expectedRoot": "679209",
+  "secretValue": "456", 
+  "salt": "789",
+  "sibling1": "100",
+  "sibling2": "200", 
+  "sibling3": "300"
+}

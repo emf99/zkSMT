@@ -1,0 +1,12 @@
+[package]
+name = "zk_smt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ark-bls12-381 = { version = "0.4", features = ["default"] }
+ark-crypto-primitives = { version = "0.4", features = ["default", "crh", "merkle_tree"] }
+ark-std = { version = "0.4", features = ["default"] }
+ark-serialize = { version = "0.4", features = ["default"] }
+ark-ff = { version = "0.4", features = ["default"] }
+sha2 = "0.10"

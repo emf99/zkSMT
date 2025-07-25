@@ -9,6 +9,7 @@ dotenv.config({ path: '../../.env' });
 export default defineConfig({
   build: {
     emptyOutDir: true,
+    target: 'esnext',
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -23,6 +24,11 @@ export default defineConfig({
         target: "http://127.0.0.1:4943",
         changeOrigin: true,
       },
+    },
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Content-Security-Policy': "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob:; object-src 'none'; worker-src 'self' blob:;",
     },
   },
   plugins: [
@@ -40,5 +46,11 @@ export default defineConfig({
       },
     ],
     dedupe: ['@dfinity/agent'],
+  },
+  define: {
+    global: 'globalThis',
+  },
+  worker: {
+    format: 'es'
   },
 });

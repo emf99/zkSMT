@@ -1,3 +1,31 @@
+type MerkleProofEntry = record {
+    hash: text;
+    is_left: bool;
+};
+
+type VerifyRequest = record {
+    name: text;
+    id: nat64;
+    root: text;
+    zk_proof: text;
+};
+
+type ZKVerifyRequest = record {
+    key: text;
+    root: text;
+    zk_proof: text;
+};
+
 service : {
     "greet": (text) -> (text) query;
+    "insert": (text, nat64) -> ();
+    "delete": (text) -> ();
+    "generate_zk_proof": (nat64, nat64, nat64) -> (text);
+    "generate_zk_proof_for_user": (text, nat64) -> (text);
+    "get_merkle_proof": (text) -> (vec MerkleProofEntry) query;
+    "get_root": () -> (text) query;
+    "get_all_smt_entries": () -> (vec record { text; text }) query;
+    "get_smt_stats": () -> (text) query;
+    "verify_query_result": (VerifyRequest) -> (bool);
+    "verify_zk_membership": (ZKVerifyRequest) -> (bool);
 }

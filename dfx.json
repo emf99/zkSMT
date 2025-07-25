@@ -13,7 +13,10 @@
         "src/ss1_frontend/dist"
       ],
       "type": "assets",
-      "workspace": "ss1_frontend"
+      "workspace": "ss1_frontend",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self' blob:; object-src 'none';"
+      }
     }
   },
   "defaults": {

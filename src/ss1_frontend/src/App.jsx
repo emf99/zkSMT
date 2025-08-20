@@ -545,9 +545,6 @@ Debug info: ${error.stack || 'No stack trace available'}`);
               className="input"
             />
             <div className="button-group">
-              <button onClick={handleGenerateZKProof} disabled={loading} className="button primary">
-                {loading ? 'Generating...' : 'Generate ZK proof CSP safe (backend)'}
-              </button>
               <button 
                 onClick={handleGenerateDynamicZK} 
                 disabled={loading} 

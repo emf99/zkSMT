@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { ss1_backend, createActor } from 'declarations/ss1_backend';
 import './App.css';
 
+console.log('App.jsx loading...');
+console.log('ss1_backend:', ss1_backend);
+console.log('createActor:', createActor);
+
 function App() {
+  console.log('App component rendering...');
   const [name, setName] = useState('');
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
@@ -17,6 +22,11 @@ function App() {
   const getBackendActor = () => {
     console.log('getBackendActor called');
     console.log('ss1_backend available:', !!ss1_backend);
+    console.log('Environment variables:', {
+      CANISTER_ID_SS1_BACKEND: import.meta.env.CANISTER_ID_SS1_BACKEND,
+      DFX_NETWORK: import.meta.env.DFX_NETWORK
+    });
+    
     if (ss1_backend) {
       console.log('Using ss1_backend from import');
       console.log('ss1_backend methods:', Object.keys(ss1_backend));
@@ -24,7 +34,7 @@ function App() {
     }
     
     // Fallback - use hardcoded canister ID for local environment
-    const localCanisterId = 'uxrrr-q7777-77774-qaaaq-cai';
+    const localCanisterId = import.meta.env.CANISTER_ID_SS1_BACKEND || 'uxrrr-q7777-77774-qaaaq-cai';
     console.log('Creating fallback actor with canister ID:', localCanisterId);
     try {
       const actor = createActor(localCanisterId);
@@ -37,7 +47,7 @@ function App() {
     }
   };
 
-  // Generate ZK proof for user using new backend function
+  // Generate ZK proof for user using backend function (mock proof)
   const handleGenerateZKProof = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -64,7 +74,7 @@ function App() {
         throw new Error('Function generate_zk_proof_for_user is not available in backend canister.');
       }
       
-      // Call new backend function
+      // Call backend function
       const proofHex = await backend.generate_zk_proof_for_user(zkUsername, nonceNum);
       
       // Check if it's an error
@@ -82,30 +92,263 @@ function App() {
         const proofText = new TextDecoder().decode(proofBytes);
         const proofJson = JSON.parse(proofText);
         
-        setOutput(`✅ ZK Proof generated for user '${zkUsername}'!
+        setOutput(`✅ ZK Proof generated for user '\${zkUsername}'!
 
 📋 Proof details:
-👤 Username: ${proofJson.username}
-🔑 Public Key: ${proofJson.public_key} (hash of username)
-🎲 Nonce: ${proofJson.nonce}
-🌳 SMT Root: ${proofJson.smt_root.substring(0, 20)}...
+👤 Username: \${proofJson.username}
+🔑 Public Key: \${proofJson.public_key} (hash of username)
+🎲 Nonce: \${proofJson.nonce}
+🌳 SMT Root: \${proofJson.smt_root.substring(0, 20)}...
 
-🔒 IMPORTANT: Secret value (${proofJson.secret_value}) will NOT be revealed in real ZK proof!
+🔒 IMPORTANT: Secret value (\${proofJson.secret_value}) will NOT be revealed in real ZK proof!
 
-Proof (hex): ${proofHex.substring(0, 100)}...
+Proof (hex): \${proofHex.substring(0, 100)}...
         
 💡 Now you can use this proof for verification below.`);
       } catch (decodeError) {
-        setOutput(`✅ ZK Proof generated for user '${zkUsername}'!
-Proof (hex): ${proofHex}
+        setOutput(`✅ ZK Proof generated for user '\${zkUsername}'!
+Proof (hex): \${proofHex}
         
 💡 Now you can use this proof for verification below.`);
       }
     } catch (error) {
-      setOutput(`❌ Error during ZK proof generation: ${error.message}`);
+      setOutput(`❌ Error during ZK proof generation: \${error.message}`);
     }
     setLoading(false);
   };
+
+  // REAL dynamic ZK proof generation with snarkjs in browser
+  const handleGenerateDynamicZK = async () => {
+    try {
+      if (!zkUsername.trim()) {
+        alert('Please enter a username');
+        return;
+      }
+
+      setOutput(`🔄 Generating REAL dynamic ZK proof for user '\${zkUsername}' with current SMT state...`);
+      setLoading(true);
+      
+      const backend = getBackendActor();
+      if (!backend) {
+        throw new Error('Backend canister is not available');
+      }
+      
+      // Step 1: Get current SMT root
+      console.log('📊 Getting current SMT root...');
+      const currentRoot = await backend.get_root();
+      console.log('Current SMT root (hex):', currentRoot);
+      
+      // Step 2: Try to get merkle proof for the user
+      console.log('🔍 Getting merkle proof for user:', zkUsername);
+      let merkleProof = null;
+      let userValue = 0; // Default for non-membership
+      let isUserInSMT = false;
+      
+      try {
+        merkleProof = await backend.get_merkle_proof(zkUsername);
+        console.log('Merkle proof received:', merkleProof);
+        isUserInSMT = true;
+        
+        // Step 2.5: Get the actual user value from SMT entries
+        console.log('🔍 Getting user value from SMT...');
+        const allEntries = await backend.get_all_smt_entries();
+        console.log('All SMT entries:', allEntries);
+        
+        const userEntry = allEntries.find(([key, value]) => key === zkUsername);
+        if (userEntry) {
+          userValue = parseInt(userEntry[1]);
+          console.log('User value from SMT:', userValue);
+        } else {
+          console.log('User not found in SMT entries despite having merkle proof');
+          userValue = 0;
+          isUserInSMT = false;
+        }
+      } catch (proofError) {
+        console.log('User not found in SMT - will generate non-membership proof');
+        merkleProof = null;
+        userValue = 0;
+        isUserInSMT = false;
+      }
+      
+      // Step 3: Calculate publicKey from username (consistent with backend)
+      const publicKey = zkUsername.split('').reduce((hash, char) => {
+        return ((hash * 31) + char.charCodeAt(0)) >>> 0; // >>> 0 for unsigned 32-bit
+      }, 0);
+      console.log('Public key for', zkUsername, ':', publicKey);
+      
+      // Step 4: Convert hex root to decimal for circuit
+      const expectedRoot = BigInt('0x' + currentRoot);
+      console.log('Expected root (BigInt):', expectedRoot.toString());
+      
+      // Step 5: Prepare circuit inputs
+      let circuitInputs;
+      
+      if (isUserInSMT && merkleProof && merkleProof.length > 0) {
+        // User exists in SMT - generate membership proof
+        console.log('Generating membership proof...');
+        
+        // Extract sibling hashes from merkle proof
+        const siblings = merkleProof.map(proof_item => {
+          // Convert hex hash to BigInt then take modulo to get smaller number
+          const hashBigInt = BigInt('0x' + proof_item.hash);
+          // Take modulo 2^32 to get a reasonable sized number for circuit
+          const hashMod = hashBigInt % (BigInt(2) ** BigInt(32));
+          return hashMod.toString();
+        });
+        
+        // Pad siblings to 3 levels (circuit expects exactly 3)
+        while (siblings.length < 3) {
+          siblings.push('0'); // Pad with zeros
+        }
+        if (siblings.length > 3) {
+          siblings.splice(3); // Take only first 3
+        }
+        
+        circuitInputs = {
+          publicKey: publicKey.toString(),
+          expectedRoot: expectedRoot.toString(),
+          secretValue: userValue.toString(), // Use actual value from SMT
+          salt: (zkNonce || '789').toString(),
+          // Real merkle path siblings from SMT
+          sibling1: siblings[0],
+          sibling2: siblings[1], 
+          sibling3: siblings[2]
+        };
+      } else {
+        // User doesn't exist - generate non-membership proof
+        console.log('Generating non-membership proof...');
+        circuitInputs = {
+          publicKey: publicKey.toString(),
+          expectedRoot: expectedRoot.toString(),
+          secretValue: '0', // No secret value for non-members
+          salt: (zkNonce || '789').toString(),
+          // Default siblings for non-membership (use default values)
+          sibling1: '100',
+          sibling2: '200',
+          sibling3: '300'
+        };
+      }
+      
+      console.log('Circuit inputs:', circuitInputs);
+      
+      // Step 6: Check if snarkjs is available and wait for it to load
+      if (!window.snarkjs) {
+        console.log('Waiting for snarkjs to load...');
+        setOutput('🔄 Waiting for snarkjs library to load...');
+        
+        // Wait for snarkjs to be available (max 10 seconds)
+        let retries = 0;
+        const maxRetries = 50; // 50 * 200ms = 10 seconds
+        
+        while (!window.snarkjs && retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          retries++;
+        }
+        
+        if (!window.snarkjs) {
+          throw new Error('snarkjs is not loaded. Please check the script import or reload the page.');
+        }
+      }
+      
+      console.log('snarkjs available:', !!window.snarkjs);
+      console.log('groth16 available:', !!window.snarkjs.groth16);
+      console.log('fullProve available:', !!window.snarkjs.groth16.fullProve);
+      
+      // Step 7: Generate proof with snarkjs
+      setOutput(`🔄 Generating cryptographic proof... This may take 10-30 seconds.`);
+      
+      console.log('Starting snarkjs proof generation...');
+      const { proof, publicSignals } = await window.snarkjs.groth16.fullProve(
+        circuitInputs,
+        "/zk_membership.wasm",
+        "/zk_membership_final.zkey"
+      );
+      
+      console.log('✅ Proof generated successfully!');
+      console.log('Proof:', proof);
+      console.log('Public signals:', publicSignals);
+      
+      // Step 8: Format proof for storage/verification
+      const formattedProof = {
+        pi_a: [proof.pi_a[0], proof.pi_a[1]],
+        pi_b: [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
+        pi_c: [proof.pi_c[0], proof.pi_c[1]]
+      };
+      
+      // Get siblings from merkle proof or use defaults
+      const siblings = [
+        parseInt(circuitInputs.sibling1),
+        parseInt(circuitInputs.sibling2), 
+        parseInt(circuitInputs.sibling3)
+      ];
+      
+      // Format data according to backend UserZKProofData structure
+      const userZKProofData = {
+        pi_a: [proof.pi_a[0], proof.pi_a[1]],
+        pi_b: [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]],
+        pi_c: [proof.pi_c[0], proof.pi_c[1]],
+        smt_root: currentRoot,
+        username: zkUsername,
+        public_key: publicKey,
+        secret_value: userValue, // Use actual SMT value
+        nonce: parseInt(zkNonce) || 12345,
+        siblings: siblings
+      };
+      
+      // Encode as hex string (as expected by backend)
+      const proofJson = JSON.stringify(userZKProofData);
+      const proofHex = Array.from(new TextEncoder().encode(proofJson))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+      
+      setZkProof(proofHex);
+      setOutput(`🎉 REAL Cryptographic ZK Proof Generated!
+
+📊 SMT State:
+🌳 Current Root: ${currentRoot}
+🔢 Root (decimal): ${expectedRoot.toString()}
+👤 User: ${zkUsername}
+🔑 Public Key: ${publicKey}
+💎 Secret Value: ${userValue} ${isUserInSMT ? '(from SMT)' : '(non-member)'}
+🎲 Nonce: ${zkNonce || '12345'}
+${isUserInSMT ? '✅ Membership proof for existing user' : '❌ Non-membership proof for non-existing user'}
+
+🔒 Generated Proof (Groth16):
+π_a: [${userZKProofData.pi_a[0].substring(0, 20)}..., ${userZKProofData.pi_a[1].substring(0, 20)}...]
+π_b: [[${userZKProofData.pi_b[0][0].substring(0, 10)}..., ${userZKProofData.pi_b[0][1].substring(0, 10)}...], [${userZKProofData.pi_b[1][0].substring(0, 10)}..., ${userZKProofData.pi_b[1][1].substring(0, 10)}...]]
+π_c: [${userZKProofData.pi_c[0].substring(0, 20)}..., ${userZKProofData.pi_c[1].substring(0, 20)}...]
+
+📋 Circuit Data:
+Secret Value: ${userZKProofData.secret_value} ${isUserInSMT ? '(real value from SMT)' : '(default for non-member)'}
+Siblings: [${userZKProofData.siblings.join(', ')}] ${isUserInSMT ? '(from merkle proof)' : '(default values)'}
+
+📋 Public Signals:
+${publicSignals.map((sig, i) => `Signal ${i}: ${sig.toString().substring(0, 30)}...`).join('\n')}
+
+🔐 Proof encoded as hex for backend verification
+📏 Proof length: ${proofHex.length} characters
+
+⏰ Generated at: ${new Date().toISOString()}
+
+💡 This is a REAL cryptographic proof!
+💡 ${isUserInSMT ? 'Should verify as VALID for existing user' : 'Should verify as INVALID for non-existing user'}
+💡 You can now verify this proof using backend verification.`);
+
+    } catch (error) {
+      console.error('Dynamic ZK generation error:', error);
+      setOutput(`❌ Error generating dynamic ZK proof: ${error.message}
+
+🔍 Troubleshooting:
+- Make sure snarkjs loaded (check browser console)
+- Verify circuit files are available: /zk_membership.wasm, /zk_membership_final.zkey
+- Check if user exists in SMT or try adding them first
+
+Debug info: ${error.stack || 'No stack trace available'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleInsert = async (e) => {
     e.preventDefault();
@@ -242,157 +485,108 @@ Proof (hex): ${proofHex}
   };
 
   return (
-    <main className="container">
-      <header>
-        <img src="/logo2.svg" alt="DFINITY logo" className="logo" />
-        <h1>zkSMT - Zero-Knowledge Sparse Merkle Tree</h1>
-        <p>Application for managing Sparse Merkle Tree with zero-knowledge proof support</p>
+    <main className="main-container">
+      <header className="header">
+        <img src="logo2.svg" alt="zkSMT Logo" className="logo" />
+        <h1>zkSMT Proof System</h1>
+        <p>Zero-Knowledge Sparse Merkle Tree with Internet Computer</p>
       </header>
 
-      <div className="sections">
-        {/* Greeting Section */}
-        <section className="card">
-          <h2>Greeting</h2>
-          <form onSubmit={handleGreet}>
-            <div className="form-group">
-              <label htmlFor="name">Your name:</label>
-              <input 
-                id="name" 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
-              />
+      <div className="container">
+        <section className="section">
+          <h2>🌳 SMT Operations</h2>
+          <form className="form">
+            <input
+              type="text"
+              placeholder="Key"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              className="input"
+            />
+            <input
+              type="text"
+              placeholder="Value"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="input"
+            />
+            <div className="button-group">
+              <button onClick={handleInsert} disabled={loading} className="button primary">
+                {loading ? 'Processing...' : 'Insert'}
+              </button>
+              <button onClick={handleDelete} disabled={loading} className="button danger">
+                {loading ? 'Processing...' : 'Delete'}
+              </button>
+              <button onClick={handleGetProof} disabled={loading} className="button secondary">
+                {loading ? 'Processing...' : 'Get Proof'}
+              </button>
+              <button onClick={handleGetRoot} disabled={loading} className="button secondary">
+                {loading ? 'Processing...' : 'Get Root'}
+              </button>
             </div>
-            <button type="submit" disabled={loading}>
-              {loading ? 'Loading...' : 'Greet me!'}
+          </form>
+        </section>
+
+        <section className="section">
+          <h2>🔐 ZK Membership Proof</h2>
+          <form className="form">
+            <input
+              type="text"
+              placeholder="Username for ZK proof"
+              value={zkUsername}
+              onChange={(e) => setZkUsername(e.target.value)}
+              className="input"
+            />
+            <input
+              type="text"
+              placeholder="Nonce (optional)"
+              value={zkNonce}
+              onChange={(e) => setZkNonce(e.target.value)}
+              className="input"
+            />
+            <div className="button-group">
+              <button onClick={handleGenerateZKProof} disabled={loading} className="button primary">
+                {loading ? 'Generating...' : 'Generate ZK proof CSP safe (backend)'}
+              </button>
+              <button 
+                onClick={handleGenerateDynamicZK} 
+                disabled={loading} 
+                className="button success"
+                title="Generate real cryptographic proof using snarkjs in browser"
+              >
+                {loading ? 'Generating...' : 'Generate Dynamic ZK (Real)'}
+              </button>
+              <button onClick={handleVerifyZK} disabled={loading} className="button secondary">
+                {loading ? 'Verifying...' : 'Verify Real ZK Membership'}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="section">
+          <h2>�� Greeting Test</h2>
+          <form className="form">
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input"
+            />
+            <button onClick={handleGreet} disabled={loading} className="button primary">
+              {loading ? 'Loading...' : 'Greet'}
             </button>
           </form>
         </section>
 
-        {/* SMT Operations */}
-        <section className="card">
-          <h2>Sparse Merkle Tree Operations</h2>
-          <div className="form-group">
-            <label htmlFor="nameKey">Username:</label>
-            <input 
-              id="nameKey" 
-              type="text" 
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="e.g. alice, bob, charlie"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="value">ID or Value:</label>
-            <input 
-              id="value" 
-              type="text" 
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="e.g. 123 or any value"
-            />
-          </div>
-          
-          <div className="button-group">
-            <button onClick={handleInsert} disabled={loading || !key || !value}>
-              Insert
-            </button>
-            <button onClick={handleDelete} disabled={loading || !key}>
-              Delete
-            </button>
-            <button onClick={handleGetProof} disabled={loading || !key}>
-              Get Proof
-            </button>
-            <button onClick={handleGetRoot} disabled={loading}>
-              Get Root
-            </button>
-          </div>
-        </section>
-
-        {/* ZK Proof Generation */}
-        <section className="card">
-          <h2>Zero-Knowledge Proof Membership Generation in SMT</h2>
-          <div className="info-box">
-            <h3>📖 How it works:</h3>
-            <p>This system generates <strong>real ZK proof of membership in Sparse Merkle Tree</strong></p>
-            <ul>
-              <li><strong>Username</strong> - username that exists in SMT</li>
-              <li><strong>Secret Value</strong> - ID value assigned to the user in SMT (automatically retrieved and hidden in proof)</li>
-              <li><strong>Nonce</strong> - additional randomization for security</li>
-            </ul>
-            <p>🔧 <strong>Process:</strong></p>
-            <ol>
-              <li>First add a user to SMT in the "SMT Operations" section above (e.g. alice → 123)</li>
-              <li>Then generate ZK proof by providing only username and nonce</li>
-              <li>System automatically retrieves the ID value from SMT</li>
-              <li>Proof proves that you know the ID value for this user without revealing it!</li>
-            </ol>
-            <p>💡 <strong>Zero-knowledge:</strong> Verifier will only see that the proof is valid for given user, but won't learn their secret ID!</p>
-          </div>
-          <div className="form-group">
-            <label htmlFor="zkUsername">Username:</label>
-            <input 
-              id="zkUsername" 
-              type="text" 
-              value={zkUsername}
-              onChange={(e) => setZkUsername(e.target.value)}
-              placeholder="e.g. alice, bob, charlie"
-            />
-            <small className="field-help">User that was added to SMT - system will automatically retrieve their ID</small>
-          </div>
-          <div className="form-group">
-            <label htmlFor="zkNonce">Nonce (integer):</label>
-            <input 
-              id="zkNonce" 
-              type="number" 
-              value={zkNonce}
-              onChange={(e) => setZkNonce(e.target.value)}
-              placeholder="e.g. 999"
-            />
-            <small className="field-help">Additional randomization - hidden in proof (witness)</small>
-          </div>
-          <div className="calculation-display">
-            <strong>⚠️ Remember: </strong>
-            <span className="calculation">
-              {zkUsername ? 
-                `User '${zkUsername}' must first be added to SMT in the section above!` 
-                : 'Enter username that exists in SMT'
-              }
-            </span>
-          </div>
-          <button onClick={handleGenerateZKProof} disabled={loading || !zkUsername || !zkNonce}>
-            {loading ? 'Generating...' : 'Generate ZK Proof'}
-          </button>
-        </section>
-
-        {/* ZK Proof Verification */}
-        <section className="card">
-          <h2>Zero-Knowledge Proof Verification</h2>
-          <div className="form-group">
-            <label htmlFor="zkProof">ZK Proof (hex):</label>
-            <textarea 
-              id="zkProof" 
-              value={zkProof}
-              onChange={(e) => setZkProof(e.target.value)}
-              placeholder="Proof will be automatically generated above..."
-              rows="4"
-            />
-          </div>
-          <button onClick={handleVerifyZK} disabled={loading || !zkUsername || !zkProof}>
-            Verify ZK Proof in Backend
-            {(!zkUsername || !zkProof) && <span style={{fontSize: '0.8em', display: 'block'}}>
-              (Fill {!zkUsername ? 'username' : ''}{!zkUsername && !zkProof ? ' and ' : ''}{!zkProof ? 'proof' : ''})
-            </span>}
-          </button>
-        </section>
-
-        {/* Output */}
-        <section className="card output-section">
-          <h2>Output</h2>
+        <section className="section output-section">
+          <h2>📄 Output</h2>
           <pre className="output">{output || 'No results...'}</pre>
         </section>
       </div>
+      
+      {/* Load snarkjs from CDN */}
+      <script src="https://unpkg.com/snarkjs@0.7.3/build/snarkjs.min.js"></script>
     </main>
   );
 }

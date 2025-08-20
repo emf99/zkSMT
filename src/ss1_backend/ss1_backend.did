@@ -1,3 +1,5 @@
+type Result = variant { Ok : nat64; Err : text };
+
 type MerkleProofEntry = record {
     hash: text;
     is_left: bool;
@@ -24,8 +26,12 @@ service : {
     "generate_zk_proof_for_user": (text, nat64) -> (text);
     "get_merkle_proof": (text) -> (vec MerkleProofEntry) query;
     "get_root": () -> (text) query;
+    "get_root_as_number": () -> (text) query;
+    "get_value": (text) -> (Result) query;
+    "compute_public_key": (text) -> (nat64) query;
     "get_all_smt_entries": () -> (vec record { text; text }) query;
     "get_smt_stats": () -> (text) query;
     "verify_query_result": (VerifyRequest) -> (bool);
     "verify_zk_membership": (ZKVerifyRequest) -> (bool);
+    "verify_real_zk_membership": (text, text, text) -> (bool);
 }

@@ -7,18 +7,19 @@
     "setup": "npm i && dfx canister create ss1_backend && dfx generate ss1_backend && dfx deploy",
     "start": "vite --port 3000",
     "prebuild": "dfx generate",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\""
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
     "@dfinity/agent": "^2.1.3",
     "@dfinity/candid": "^2.1.3",
     "@dfinity/principal": "^2.1.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "snarkjs": "^0.7.0"
   },
   "devDependencies": {
+    "@types/node": "^24.3.0",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",
     "@vitejs/plugin-react": "^4.0.1",

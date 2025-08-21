@@ -462,8 +462,7 @@ cd circuits
 
 ---
 
-*This implementation demonstrates **production-grade zero-knowledge cryptography** in a user-friendly interface. The mathematical foundations are the same as those securing billions of dollars in blockchain protocols.*
-- Gas optimization for mainnet deployment
+
 
 ## � Learn More
 

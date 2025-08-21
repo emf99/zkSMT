@@ -453,18 +453,10 @@ cd circuits
 
 ---
 
-## 📚 Additional Resources
+## 📚 Learn More
 
-- **ZK-SNARKs**: [Zcash Protocol Spec](https://zips.z.cash/protocol/protocol.pdf)
-- **Groth16**: [Original Paper](https://eprint.iacr.org/2016/260.pdf) 
-- **Circom**: [Circuit Documentation](https://docs.circom.io/)
-- **snarkjs**: [JavaScript Implementation](https://github.com/iden3/snarkjs)
-
----
-
-
-
-## � Learn More
+### 📽️ Presentation:
+- [**Project Demo & Technical Overview**](https://www.loom.com/share/2cef3811601748afb2dcffe496e5f9e3?sid=88bfb0b6-0e72-49f5-94e8-6d789c859f93) - Live demonstration of zkSMT with real ZK proofs
 
 ### Zero-Knowledge Resources:
 - [ZK-SNARKs Explained](https://blog.ethereum.org/2016/12/05/zksnarks-in-a-nutshell/)
@@ -502,6 +494,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Remember**: This is an educational demonstration of Zero-Knowledge Sparse Merkle Trees. The magic is that Alice can prove she belongs to the system without anyone ever learning her secret ID! 🎭✨
-```bash
 
 
